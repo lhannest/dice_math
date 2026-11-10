@@ -44,7 +44,7 @@ class _DiePainter extends CustomPainter {
     canvas.drawLine(vertices[5], a, paint);
     final text = TextPainter(
       text: const TextSpan(
-        text: '20',
+        text: '±',
         style: TextStyle(
           color: gold,
           fontFamily: 'sans-serif',
