@@ -472,7 +472,7 @@ class _PracticeScreenState extends State<PracticeScreen>
           }),
           child: ExcludeSemantics(
             child: Opacity(
-              opacity: counted ? .75 : 1,
+              opacity: counted ? .5 : 1,
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

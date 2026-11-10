@@ -119,7 +119,7 @@ void main() {
     final first = find.text('4').at(0);
     final second = find.text('4').at(1);
     final dimmed = find.byWidgetPredicate(
-      (widget) => widget is Opacity && widget.opacity == .75,
+      (widget) => widget is Opacity && widget.opacity == .5,
     );
 
     await tester.tap(first);
