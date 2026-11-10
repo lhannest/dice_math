@@ -105,7 +105,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
           const SizedBox(height: 14),
           Text(
-            '${stats.count} answered  ·  ${stats.bestStreak} best streak',
+            '${stats.count} attempts  ·  ${stats.bestStreak} best streak',
             style: const TextStyle(color: muted, fontSize: 13),
           ),
           if (attempts.length >= 40) ...[
@@ -148,7 +148,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      '${(item.accuracy * 100).round()}% correct  ·  ${item.medianSeconds == null ? '—' : '${item.medianSeconds!.toStringAsFixed(1)}s'} typical  ·  ${item.count} answered',
+                      '${(item.accuracy * 100).round()}% correct  ·  ${item.medianSeconds == null ? '—' : '${item.medianSeconds!.toStringAsFixed(1)}s'} typical  ·  ${item.count} attempts',
                       style: const TextStyle(color: muted, fontSize: 12),
                     ),
                     if (entry.value.length >= 40) ...[
@@ -161,7 +161,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             );
           }),
           const SizedBox(height: 16),
-          const SectionLabel('Recent answers'),
+          const SectionLabel('Recent attempts'),
           const SizedBox(height: 12),
           ...attempts.reversed
               .take(10)
@@ -187,7 +187,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
                               style: const TextStyle(fontSize: 14),
                             ),
                             Text(
-                              '${_date(attempt.at.toLocal())} · ${attempt.at.toLocal().hour.toString().padLeft(2, '0')}:${attempt.at.toLocal().minute.toString().padLeft(2, '0')}${attempt.correct ? '' : ' · entered ${attempt.answer}'}',
+                              '${_date(attempt.at.toLocal())} · ${attempt.at.toLocal().hour.toString().padLeft(2, '0')}:${attempt.at.toLocal().minute.toString().padLeft(2, '0')}${attempt.timedOut
+                                  ? ' · timed out'
+                                  : attempt.correct
+                                  ? ''
+                                  : ' · entered ${attempt.answer}'}',
                               style: const TextStyle(
                                 color: muted,
                                 fontSize: 11,
@@ -207,7 +211,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
           const SizedBox(height: 10),
           const Text(
-            'Only submitted answers count. Leaving practice adds nothing to your history.',
+            'Submitted answers and timeouts count toward your progress.',
             style: TextStyle(color: muted, fontSize: 12, height: 1.6),
           ),
         ],
@@ -291,7 +295,7 @@ class _Comparison extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Last 20 answers vs previous 20',
+          'Last 20 attempts vs previous 20',
           style: TextStyle(color: muted, fontSize: 11),
         ),
       ],

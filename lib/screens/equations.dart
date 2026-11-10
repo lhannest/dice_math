@@ -79,7 +79,7 @@ class EquationsScreen extends StatelessWidget {
       Text('Equations', style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 10),
       const Text(
-        'Choose what you want to get quicker at.\nEach enabled equation is equally likely to appear.',
+        'New rolls are drawn equally from enabled equations. Missed rolls can return for review.',
         style: TextStyle(color: muted, height: 1.6),
       ),
       const SizedBox(height: 26),

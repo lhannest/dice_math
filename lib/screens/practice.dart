@@ -20,15 +20,21 @@ class _PracticeScreenState extends State<PracticeScreen>
   late final Random _random = widget.random ?? Random();
   late final List<DiceExpression> _equations = widget.store.enabled;
   final Stopwatch _clock = Stopwatch();
+  final ValueNotifier<double> _remaining = ValueNotifier(1);
   final FocusNode _keyboard = FocusNode();
   final Set<int> _counted = {};
   late RolledQuestion _question;
+  late Duration _timeLimit;
   String _answer = '';
   int _streak = 0;
-  bool? _correct;
+  Attempt? _attempt;
+  bool? get _correct => _attempt?.correct;
+  bool get _timedOut => _attempt?.timedOut ?? false;
   bool _paused = false;
   bool _ready = false;
   Timer? _advance;
+  Timer? _deadline;
+  Timer? _refreshBar;
   int _generation = 0;
 
   @override
@@ -39,32 +45,48 @@ class _PracticeScreenState extends State<PracticeScreen>
   }
 
   void _newQuestion() {
-    _clock.stop();
-    _ready = false;
-    _question = _equations[_random.nextInt(_equations.length)].roll(_random);
+    _stopQuestion();
+    _question =
+        widget.store.reviewQuestion(_random) ??
+        _equations[_random.nextInt(_equations.length)].roll(_random);
+    _timeLimit = Duration(
+      seconds: widget.store.secondsPerTerm * _question.numbers.length,
+    );
     _counted.clear();
     _answer = '';
-    _correct = null;
-    final generation = ++_generation;
+    _attempt = null;
+    _remaining.value = 1;
+    final generation = _generation;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_paused && generation == _generation) {
         _clock
           ..reset()
           ..start();
         _ready = true;
+        _deadline = Timer(_timeLimit, () => _submit(null));
+        _refreshBar = Timer.periodic(const Duration(milliseconds: 100), (_) {
+          _remaining.value =
+              (1 - _clock.elapsedMicroseconds / _timeLimit.inMicroseconds)
+                  .clamp(0.0, 1.0);
+        });
       }
     });
+  }
+
+  void _stopQuestion() {
+    _generation++;
+    _ready = false;
+    _clock.stop();
+    _advance?.cancel();
+    _deadline?.cancel();
+    _refreshBar?.cancel();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed && !_paused) {
-      _advance?.cancel();
-      _clock.stop();
-      setState(() {
-        _paused = true;
-        _ready = false;
-      });
+      _stopQuestion();
+      setState(() => _paused = true);
     }
   }
 
@@ -77,7 +99,7 @@ class _PracticeScreenState extends State<PracticeScreen>
   }
 
   void _type(String key) {
-    if (!_ready || _paused || _correct != null) return;
+    if (!_ready) return;
     setState(() {
       if (key == 'back') {
         if (_answer.isNotEmpty) {
@@ -101,24 +123,28 @@ class _PracticeScreenState extends State<PracticeScreen>
     }
   }
 
-  void _submit(int answer) {
-    _clock.stop();
+  void _submit(int? answer) {
+    if (!_ready) return;
+    _stopQuestion();
+    if (_clock.elapsed >= _timeLimit) answer = null;
+    final timedOut = answer == null;
     final correct = answer == _question.total;
-    widget.store.record(
-      Attempt(
-        at: DateTime.now(),
-        equation: _question.equation,
-        calculation: _question.calculation,
-        answer: answer,
-        expected: _question.total,
-        milliseconds: _clock.elapsedMilliseconds,
-        streak: correct ? _streak + 1 : 0,
-      ),
+    final attempt = Attempt(
+      at: DateTime.now(),
+      equation: _question.equation,
+      calculation: _question.calculation,
+      answer: answer,
+      expected: _question.total,
+      milliseconds: timedOut
+          ? _timeLimit.inMilliseconds
+          : _clock.elapsedMilliseconds,
+      streak: correct ? _streak + 1 : 0,
     );
+    widget.store.record(attempt, question: _question);
+    _remaining.value = 1 - attempt.milliseconds / _timeLimit.inMilliseconds;
     setState(() {
-      _ready = false;
-      _correct = correct;
-      _streak = correct ? _streak + 1 : 0;
+      _attempt = attempt;
+      _streak = attempt.streak;
     });
     if (!MediaQuery.of(context).disableAnimations) {
       if (correct) {
@@ -127,7 +153,7 @@ class _PracticeScreenState extends State<PracticeScreen>
         HapticFeedback.mediumImpact();
       }
     }
-    _advance = Timer(const Duration(milliseconds: 380), () {
+    _advance = Timer(Duration(milliseconds: timedOut ? 1000 : 380), () {
       if (mounted && !_paused) setState(_newQuestion);
     });
   }
@@ -152,14 +178,21 @@ class _PracticeScreenState extends State<PracticeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _advance?.cancel();
-    _clock.stop();
+    _stopQuestion();
+    _remaining.dispose();
     _keyboard.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PopScope<void>(
+    onPopInvokedWithResult: (didPop, _) {
+      if (didPop) _stopQuestion();
+    },
+    child: _buildPractice(context),
+  );
+
+  Widget _buildPractice(BuildContext context) {
     final feedbackColor = _correct == true ? success : failure;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
     return Focus(
@@ -173,6 +206,18 @@ class _PracticeScreenState extends State<PracticeScreen>
               constraints: const BoxConstraints(maxWidth: 540),
               child: Column(
                 children: [
+                  if (!_paused)
+                    ValueListenableBuilder<double>(
+                      valueListenable: _remaining,
+                      builder: (context, remaining, _) => LinearProgressIndicator(
+                        value: remaining,
+                        minHeight: 5,
+                        color: remaining <= .25 ? failure : gold,
+                        backgroundColor: panel,
+                        semanticsLabel:
+                            '${(remaining * _timeLimit.inSeconds).ceil()} seconds remaining',
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                     child: Row(
@@ -328,7 +373,7 @@ class _PracticeScreenState extends State<PracticeScreen>
                                                         liveRegion: true,
                                                         label: _correct!
                                                             ? 'Correct'
-                                                            : 'Incorrect. The answer is ${_question.total}',
+                                                            : '${_timedOut ? 'Time’s up.' : 'Incorrect.'} The answer is ${_question.total}',
                                                         child: Row(
                                                           key: ValueKey(
                                                             _correct,
@@ -347,6 +392,22 @@ class _PracticeScreenState extends State<PracticeScreen>
                                                                   feedbackColor,
                                                               size: 34,
                                                             ),
+                                                            if (_timedOut)
+                                                              Padding(
+                                                                padding:
+                                                                    const EdgeInsets.only(
+                                                                      left: 12,
+                                                                    ),
+                                                                child: Text(
+                                                                  'Time’s up',
+                                                                  style: TextStyle(
+                                                                    color:
+                                                                        feedbackColor,
+                                                                    fontSize:
+                                                                        24,
+                                                                  ),
+                                                                ),
+                                                              ),
                                                             if (!_correct!) ...[
                                                               const SizedBox(
                                                                 width: 12,

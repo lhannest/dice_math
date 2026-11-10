@@ -148,6 +148,18 @@ class RolledNumber {
   String get display => mode == RollMode.normal
       ? '${values.first}'
       : '${mode == RollMode.advantage ? '↑' : '↓'}(${values.join(', ')})';
+
+  Map<String, Object> toJson() => {
+    'sign': sign,
+    'values': values,
+    'mode': mode.name,
+  };
+
+  factory RolledNumber.fromJson(Map<String, dynamic> json) => RolledNumber(
+    sign: json['sign'] as int,
+    values: List<int>.unmodifiable(json['values'] as List),
+    mode: RollMode.values.byName(json['mode'] as String),
+  );
 }
 
 class RolledQuestion {
@@ -162,4 +174,18 @@ class RolledQuestion {
         : (number.sign < 0 ? ' − ' : ' + ');
     return '$sign${number.display}';
   }).join();
+
+  Map<String, Object> toJson() => {
+    'equation': equation,
+    'numbers': numbers.map((number) => number.toJson()).toList(),
+  };
+
+  factory RolledQuestion.fromJson(Map<String, dynamic> json) => RolledQuestion(
+    json['equation'] as String,
+    List<RolledNumber>.unmodifiable(
+      (json['numbers'] as List).map(
+        (number) => RolledNumber.fromJson(number as Map<String, dynamic>),
+      ),
+    ),
+  );
 }

@@ -17,16 +17,76 @@ Future<PracticeStore> makeStore() async {
   return store;
 }
 
-Future<void> openPractice(WidgetTester tester, PracticeStore store) async {
+Future<void> openPractice(
+  WidgetTester tester,
+  PracticeStore store, {
+  List<int> rolls = const [3],
+}) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: PracticeScreen(store: store, random: SequenceRandom([3])),
+      home: PracticeScreen(store: store, random: SequenceRandom(rolls)),
     ),
   );
   await tester.pump();
 }
 
 void main() {
+  testWidgets('timer uses displayed terms and a timeout enters review', (
+    tester,
+  ) async {
+    final store = await makeStore();
+    await store.putEquation('2d6 + 7', index: 0);
+    await store.setSecondsPerTerm(2);
+    for (var i = 0; i < 8; i++) {
+      await store.record(attempt());
+    }
+    await openPractice(tester, store, rolls: [0, 3, 5, 1, 2]);
+
+    final bar = find.byType(LinearProgressIndicator);
+    expect(
+      tester.widget<LinearProgressIndicator>(bar).semanticsLabel,
+      '6 seconds remaining',
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.pump(const Duration(milliseconds: 5999));
+    expect(store.attempts.length, 8);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(store.attempts.length, 9);
+    expect(store.attempts.last.calculation, '4 + 6 + 7');
+    expect(store.attempts.last.timedOut, isTrue);
+    expect(store.attempts.last.milliseconds, 6000);
+    expect(store.attempts.last.streak, 0);
+    expect(tester.widget<LinearProgressIndicator>(bar).value, 0);
+    expect(find.text('Time’s up'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.widget<LinearProgressIndicator>(bar).value, 1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit7);
+    expect(store.attempts.length, 10);
+    expect(store.attempts.last.calculation, '4 + 6 + 7');
+    expect(store.attempts.last.correct, isTrue);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the practice home can validate and save the timer', (
+    tester,
+  ) async {
+    final store = await makeStore();
+    await tester.pumpWidget(DiceMathApp(store: store));
+    await tester.tap(find.text('3s per term'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '0');
+    await tester.tap(find.text('Save timer'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a whole number from 1 to 60.'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField), '5');
+    await tester.tap(find.text('Save timer'));
+    await tester.pumpAndSettle();
+    expect(find.text('5s per term'), findsOneWidget);
+    expect(store.secondsPerTerm, 5);
+  });
+
   testWidgets(
     'clean question, one submission, fast feedback, next roll and streak reset',
     (tester) async {
@@ -79,7 +139,7 @@ void main() {
       await openPractice(tester, store);
       await tester.sendKeyEvent(LogicalKeyboardKey.digit5);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-      await tester.pump();
+      await tester.pump(const Duration(seconds: 10));
       expect(find.text('Resume practice'), findsOneWidget);
       expect(store.attempts, isEmpty);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);

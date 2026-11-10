@@ -11,14 +11,15 @@ class Attempt {
   final DateTime at;
   final String equation;
   final String calculation;
-  final int answer;
+  final int? answer;
   final int expected;
   final int milliseconds;
   final int streak;
   bool get correct => answer == expected;
+  bool get timedOut => answer == null;
   double get seconds => milliseconds / 1000;
 
-  Map<String, Object> toJson() => {
+  Map<String, Object?> toJson() => {
     'at': at.toUtc().toIso8601String(),
     'equation': equation,
     'calculation': calculation,
@@ -31,7 +32,7 @@ class Attempt {
     at: DateTime.parse(json['at'] as String),
     equation: json['equation'] as String,
     calculation: json['calculation'] as String,
-    answer: json['answer'] as int,
+    answer: json['answer'] as int?,
     expected: json['expected'] as int,
     milliseconds: json['milliseconds'] as int,
     streak: json['streak'] as int? ?? 0,

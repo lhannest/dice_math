@@ -114,6 +114,52 @@ class _PracticeHome extends StatelessWidget {
   const _PracticeHome({required this.store, required this.onEquations});
   final PracticeStore store;
   final VoidCallback onEquations;
+
+  Future<void> _editTime(BuildContext context) {
+    var input = store.secondsPerTerm.toString();
+    String? error;
+    return showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          void save() {
+            try {
+              store.setSecondsPerTerm(int.tryParse(input.trim()) ?? 0);
+              Navigator.pop(context);
+            } on FormatException catch (e) {
+              setState(() => error = e.message);
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('Question timer'),
+            content: TextFormField(
+              initialValue: input,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                labelText: 'Seconds per term',
+                helperText: 'Each displayed term adds this much time.',
+                helperMaxLines: 2,
+                errorText: error,
+                errorMaxLines: 2,
+              ),
+              onChanged: (value) => input = value,
+              onFieldSubmitted: (_) => save(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              TextButton(onPressed: save, child: const Text('Save timer')),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final stats = PracticeStats(store.attempts);
@@ -165,12 +211,18 @@ class _PracticeHome extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          store.enabled.isEmpty
-              ? 'Enable an equation to start practicing.'
-              : 'No rounds. No countdown. Just you and the numbers.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: muted, fontSize: 12),
+        if (store.enabled.isEmpty)
+          const Text(
+            'Enable an equation to start practicing.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: muted, fontSize: 12),
+          ),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => _editTime(context),
+            icon: const Icon(Icons.timer_outlined, size: 18),
+            label: Text('${store.secondsPerTerm}s per term'),
+          ),
         ),
         const SizedBox(height: 34),
         Row(

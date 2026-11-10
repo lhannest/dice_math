@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models/dice.dart';
@@ -30,6 +31,10 @@ class EquationEntry {
 
 class PracticeStore extends ChangeNotifier {
   PracticeStore(this.repository);
+  static const defaultSecondsPerTerm = 3;
+  static const maxSecondsPerTerm = 60;
+  static const _reviewInterval = 10;
+
   final PracticeRepository repository;
   List<EquationEntry> _equations = [
     EquationEntry(DiceExpression.parse('1d20 + 7')),
@@ -37,6 +42,9 @@ class PracticeStore extends ChangeNotifier {
     EquationEntry(DiceExpression.parse('2d6 + 3')),
   ];
   final List<Attempt> _attempts = [];
+  final _reviewBank = <(String, String), RolledQuestion>{};
+  int _secondsPerTerm = defaultSecondsPerTerm;
+  int get secondsPerTerm => _secondsPerTerm;
   List<EquationEntry> get equations => List.unmodifiable(_equations);
   List<Attempt> get attempts => List.unmodifiable(_attempts);
   List<DiceExpression> get enabled =>
@@ -61,10 +69,23 @@ class PracticeStore extends ChangeNotifier {
         final attempts = (json['attempts'] as List)
             .map((e) => Attempt.fromJson(e as Map<String, dynamic>))
             .toList();
+        final reviewBank = (json['reviewBank'] as List? ?? []).map(
+          (e) => RolledQuestion.fromJson(e as Map<String, dynamic>),
+        );
+        final bankByCalculation = {
+          for (final question in reviewBank)
+            (question.equation, question.calculation): question,
+        };
+        final secondsPerTerm =
+            json['secondsPerTerm'] as int? ?? defaultSecondsPerTerm;
         _equations = equations;
         _attempts
           ..clear()
           ..addAll(attempts);
+        _reviewBank
+          ..clear()
+          ..addAll(bankByCalculation);
+        _secondsPerTerm = secondsPerTerm.clamp(1, maxSecondsPerTerm);
       }
       storageError = null;
       isLoaded = true;
@@ -80,6 +101,8 @@ class PracticeStore extends ChangeNotifier {
     final value = jsonEncode({
       'equations': _equations.map((e) => e.toJson()).toList(),
       'attempts': _attempts.map((a) => a.toJson()).toList(),
+      'reviewBank': _reviewBank.values.map((q) => q.toJson()).toList(),
+      'secondsPerTerm': _secondsPerTerm,
     });
     _pending = _pending.then((_) async {
       try {
@@ -96,8 +119,37 @@ class PracticeStore extends ChangeNotifier {
   }
 
   Future<void> retrySave() => _save();
-  Future<void> record(Attempt attempt) {
+
+  Future<void> setSecondsPerTerm(int seconds) {
+    if (seconds < 1 || seconds > maxSecondsPerTerm) {
+      throw const FormatException(
+        'Enter a whole number from 1 to $maxSecondsPerTerm.',
+      );
+    }
+    if (_secondsPerTerm == seconds) return Future.value();
+    _secondsPerTerm = seconds;
+    return _save();
+  }
+
+  RolledQuestion? reviewQuestion(Random random) {
+    if ((_attempts.length + 1) % _reviewInterval != 0) return null;
+    final enabledEquations = enabled.map((e) => e.notation).toSet();
+    final eligible = _reviewBank.values
+        .where((question) => enabledEquations.contains(question.equation))
+        .toList();
+    return eligible.isEmpty ? null : eligible[random.nextInt(eligible.length)];
+  }
+
+  Future<void> record(Attempt attempt, {RolledQuestion? question}) {
     _attempts.add(attempt);
+    if (question != null) {
+      final key = (question.equation, question.calculation);
+      if (attempt.correct) {
+        _reviewBank.remove(key);
+      } else {
+        _reviewBank[key] = question;
+      }
+    }
     return _save();
   }
 
@@ -113,10 +165,13 @@ class PracticeStore extends ChangeNotifier {
     if (index == null) {
       _equations.add(EquationEntry(expression));
     } else {
-      _equations[index] = EquationEntry(
-        expression,
-        enabled: _equations[index].enabled,
-      );
+      final previous = _equations[index];
+      if (previous.expression.notation != expression.notation) {
+        _reviewBank.removeWhere(
+          (key, _) => key.$1 == previous.expression.notation,
+        );
+      }
+      _equations[index] = EquationEntry(expression, enabled: previous.enabled);
     }
     return _save();
   }
@@ -131,7 +186,8 @@ class PracticeStore extends ChangeNotifier {
   }
 
   Future<void> remove(int index) {
-    _equations.removeAt(index);
+    final removed = _equations.removeAt(index);
+    _reviewBank.removeWhere((key, _) => key.$1 == removed.expression.notation);
     return _save();
   }
 }

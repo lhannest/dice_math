@@ -4,13 +4,17 @@ An offline Android app for practicing D&D dice arithmetic, built with Flutter.
 
 ## Practice
 
-Enable equations in **Equations**, then tap **Start practicing**. Every enabled equation has an equal chance of being selected. Only the rolled numbers and fixed modifiers appear during a question.
+Enable equations in **Equations**, then tap **Start practicing**. New rolls are drawn equally from enabled equations. Only the rolled numbers and fixed modifiers appear during a question.
 
 Tap a number in the calculation to dim it once you’ve counted it. Tap it again to restore it.
 
 Enter a total with the keypad or a physical keyboard. The app checks it as soon as you enter as many digits as the correct total has. For negative answers, enter the minus sign before the digits. A short success/error animation advances automatically to another question. Incorrect answers briefly show the correct total. Correct answers build a streak.
 
-Practice continues until you leave. Each submitted answer saves independently; quitting never creates a result or counts an unfinished question. Backgrounding pauses practice; resuming gives a fresh roll so time away never affects response times.
+Use the **seconds per term** control below **Start practicing** to set the timer. The default is 3 seconds for each displayed term, so `8 + 6 + 4` gets 9 seconds. An advantage or disadvantage group counts as one term. The bar at the top shows the time remaining.
+
+Wrong answers and timeouts reset your streak and save the exact roll for review. Every tenth question draws a random saved roll from your enabled equations when one is available. Answer it correctly before the timer expires to clear it from the bank.
+
+Practice continues until you leave. Each answer or timeout saves independently. Quitting or backgrounding discards the unfinished question. Resuming starts a new question.
 
 ## Equation syntax
 
@@ -27,9 +31,9 @@ Practice continues until you leave. Each submitted answer saves independently; q
 
 ## Progress
 
-Accuracy, median response time for correct answers, best streak, daily trends, per-equation statistics, and recent answers are available for the last 7 days, 30 days, or all time. Once there are 40 answers in a view, the most recent 20 are compared with the preceding 20. Per-equation comparisons help control for changing difficulty. Empty days are not treated as zero accuracy or zero time.
+Accuracy, median response time for correct answers, best streak, daily trends, per-equation statistics, and recent attempts are available for the last 7 days, 30 days, or all time. Once there are 40 attempts in a view, the most recent 20 are compared with the preceding 20. Per-equation comparisons help control for changing difficulty. Empty days are not treated as zero accuracy or zero time.
 
-The timer starts after the question's first frame and stops on submission. Feedback time is excluded. Equations and answer history are saved locally with `SharedPreferencesAsync`; the app needs no account or network connection. Uninstalling or clearing app data removes this history.
+The timer starts after the question's first frame and stops on submission or timeout. Equations, attempt history, the timer setting, and the review bank are saved locally with `SharedPreferencesAsync`. Uninstalling or clearing app data removes these records.
 
 ## Development
 

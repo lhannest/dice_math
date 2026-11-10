@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dice_math/models/dice.dart';
 import 'package:dice_math/models/history.dart';
 import 'package:dice_math/store.dart';
 
@@ -27,6 +29,38 @@ Attempt attempt({bool correct = true, int ms = 1000, int streak = 1}) =>
     );
 
 void main() {
+  test('review rolls and timer settings survive reload and mastery', () async {
+    final repository = MemoryRepository();
+    final store = PracticeStore(repository);
+    await store.load();
+    await store.setSecondsPerTerm(4);
+    final question = RolledQuestion('1d20 + 7', const [
+      RolledNumber(sign: 1, values: [4]),
+      RolledNumber(sign: 1, values: [7]),
+    ]);
+    for (var i = 0; i < 8; i++) {
+      await store.record(attempt(correct: false), question: question);
+    }
+    final random = Random(0);
+    expect(store.reviewQuestion(random), isNull);
+    await store.record(attempt(correct: false), question: question);
+
+    final restored = PracticeStore(repository);
+    await restored.load();
+    expect(restored.secondsPerTerm, 4);
+    final review = restored.reviewQuestion(random)!;
+    expect(review.calculation, question.calculation);
+    expect(review.total, question.total);
+    await restored.toggle(0);
+    expect(restored.reviewQuestion(random), isNull);
+    await restored.toggle(0);
+    await restored.record(attempt(), question: review);
+    for (var i = 0; i < 9; i++) {
+      await restored.record(attempt());
+    }
+    expect(restored.reviewQuestion(random), isNull);
+  });
+
   test('equations and submitted answers survive a complete reload', () async {
     final repository = MemoryRepository();
     final store = PracticeStore(repository);
