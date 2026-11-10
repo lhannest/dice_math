@@ -34,10 +34,11 @@ void main() {
       await openPractice(tester, store);
       expect(find.text('1d20 + 7'), findsNothing);
       expect(find.text('4'), findsWidgets);
+      expect(find.text('Check'), findsNothing);
       await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+      expect(store.attempts, isEmpty);
       await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
       await tester.pump();
       expect(store.attempts.length, 1);
       expect(store.attempts.single.correct, isTrue);
@@ -46,8 +47,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump();
       expect(find.text('?'), findsOneWidget);
-      await tester.sendKeyEvent(LogicalKeyboardKey.digit0);
-      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
       await tester.pump();
       expect(store.attempts.length, 2);
       expect(store.attempts.last.correct, isFalse);
@@ -94,18 +95,50 @@ void main() {
     tester,
   ) async {
     final store = await makeStore();
-    await store.putEquation('1d20 - 7', index: 0);
+    await store.putEquation('1d20 - 17', index: 0);
     await openPractice(tester, store);
     await tester.tap(find.text('4').last);
     await tester.tap(find.byIcon(Icons.backspace_outlined));
     await tester.tap(find.text('+/−'));
+    await tester.tap(find.text('1').last);
+    expect(store.attempts, isEmpty);
     await tester.tap(find.text('3').last);
     await tester.pump();
-    await tester.tap(find.text('Check'));
-    await tester.pump();
-    expect(store.attempts.single.answer, -3);
+    expect(store.attempts.single.answer, -13);
     expect(store.attempts.single.correct, isTrue);
     await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('counted numbers toggle independently and reset next roll', (
+    tester,
+  ) async {
+    final store = await makeStore();
+    await store.putEquation('2d20 + 7', index: 0);
+    await openPractice(tester, store);
+    final first = find.text('4').at(0);
+    final second = find.text('4').at(1);
+    final dimmed = find.byWidgetPredicate(
+      (widget) => widget is Opacity && widget.opacity == .75,
+    );
+
+    await tester.tap(first);
+    await tester.pump();
+    expect(find.ancestor(of: first, matching: dimmed), findsOneWidget);
+    expect(find.ancestor(of: second, matching: dimmed), findsNothing);
+
+    await tester.tap(first);
+    await tester.tap(second);
+    await tester.pump();
+    expect(find.ancestor(of: first, matching: dimmed), findsNothing);
+    expect(find.ancestor(of: second, matching: dimmed), findsOneWidget);
+    expect(store.attempts, isEmpty);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit5);
+    expect(store.attempts.single.correct, isTrue);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(dimmed, findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 

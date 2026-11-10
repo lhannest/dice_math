@@ -21,6 +21,7 @@ class _PracticeScreenState extends State<PracticeScreen>
   late final List<DiceExpression> _equations = widget.store.enabled;
   final Stopwatch _clock = Stopwatch();
   final FocusNode _keyboard = FocusNode();
+  final Set<int> _counted = {};
   late RolledQuestion _question;
   String _answer = '';
   int _streak = 0;
@@ -41,6 +42,7 @@ class _PracticeScreenState extends State<PracticeScreen>
     _clock.stop();
     _ready = false;
     _question = _equations[_random.nextInt(_equations.length)].roll(_random);
+    _counted.clear();
     _answer = '';
     _correct = null;
     final generation = ++_generation;
@@ -83,7 +85,7 @@ class _PracticeScreenState extends State<PracticeScreen>
         }
       } else if (key == 'sign') {
         _answer = _answer.startsWith('-') ? _answer.substring(1) : '-$_answer';
-      } else if (_answer.replaceAll('-', '').length < 7) {
+      } else {
         if (_answer == '0') {
           _answer = key;
         } else if (_answer == '-0') {
@@ -93,11 +95,13 @@ class _PracticeScreenState extends State<PracticeScreen>
         }
       }
     });
+    if (_answer.replaceFirst('-', '').length ==
+        _question.total.abs().toString().length) {
+      _submit(int.parse(_answer));
+    }
   }
 
-  void _submit() {
-    final answer = int.tryParse(_answer);
-    if (!_ready || _paused || _correct != null || answer == null) return;
+  void _submit(int answer) {
     _clock.stop();
     final correct = answer == _question.total;
     widget.store.record(
@@ -139,9 +143,6 @@ class _PracticeScreenState extends State<PracticeScreen>
       _type('back');
     } else if (event.logicalKey == LogicalKeyboardKey.minus) {
       _type('sign');
-    } else if (event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      _submit();
     } else {
       return KeyEventResult.ignored;
     }
@@ -263,68 +264,17 @@ class _PracticeScreenState extends State<PracticeScreen>
                                           horizontal: 24,
                                           vertical: 20,
                                         ),
-                                        child: Semantics(
-                                          label: _spokenCalculation,
-                                          child: ExcludeSemantics(
-                                            child: Wrap(
-                                              alignment: WrapAlignment.center,
-                                              crossAxisAlignment:
-                                                  WrapCrossAlignment.center,
-                                              spacing: 12,
-                                              runSpacing: 12,
-                                              children: _question
-                                                  .numbers
-                                                  .indexed
-                                                  .map((entry) {
-                                                    final (index, number) =
-                                                        entry;
-                                                    return FittedBox(
-                                                      fit: BoxFit.scaleDown,
-                                                      child: Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          if (index > 0 ||
-                                                              number.sign <
-                                                                  0) ...[
-                                                            Text(
-                                                              number.sign < 0
-                                                                  ? '−'
-                                                                  : '+',
-                                                              style:
-                                                                  const TextStyle(
-                                                                    fontSize:
-                                                                        28,
-                                                                    color:
-                                                                        muted,
-                                                                  ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 12,
-                                                            ),
-                                                          ],
-                                                          Text(
-                                                            number.display,
-                                                            style: TextStyle(
-                                                              fontSize:
-                                                                  number.mode ==
-                                                                      RollMode
-                                                                          .normal
-                                                                  ? 40
-                                                                  : 30,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w500,
-                                                              letterSpacing: -1,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    );
-                                                  })
-                                                  .toList(),
-                                            ),
-                                          ),
+                                        child: Wrap(
+                                          alignment: WrapAlignment.center,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          spacing: 12,
+                                          runSpacing: 12,
+                                          children: [
+                                            for (final (index, number)
+                                                in _question.numbers.indexed)
+                                              _buildNumber(index, number),
+                                          ],
                                         ),
                                       ),
                                       SizedBox(
@@ -479,38 +429,6 @@ class _PracticeScreenState extends State<PracticeScreen>
                                                       .toList(),
                                                 ),
                                               ),
-                                            const SizedBox(height: 4),
-                                            Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 4,
-                                                  ),
-                                              child: SizedBox(
-                                                width: double.infinity,
-                                                child: FilledButton(
-                                                  onPressed:
-                                                      int.tryParse(_answer) ==
-                                                              null ||
-                                                          _correct != null
-                                                      ? null
-                                                      : _submit,
-                                                  child: const Row(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      Text('Check'),
-                                                      SizedBox(width: 10),
-                                                      Icon(
-                                                        Icons
-                                                            .arrow_forward_rounded,
-                                                        size: 20,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
                                           ],
                                         ),
                                       ),
@@ -530,21 +448,57 @@ class _PracticeScreenState extends State<PracticeScreen>
     );
   }
 
-  String get _spokenCalculation => _question.numbers.indexed
-      .map((entry) {
-        final (index, number) = entry;
-        final operator = number.sign < 0
-            ? 'minus '
-            : index > 0
-            ? 'plus '
-            : '';
-        return '$operator${switch (number.mode) {
-          RollMode.normal => '${number.values.first}',
-          RollMode.advantage => 'higher of ${number.values.join(' and ')}',
-          RollMode.disadvantage => 'lower of ${number.values.join(' and ')}',
-        }}';
-      })
-      .join(' ');
+  Widget _buildNumber(int index, RolledNumber number) {
+    final counted = _counted.contains(index);
+    final operator = number.sign < 0
+        ? 'minus '
+        : index > 0
+        ? 'plus '
+        : '';
+    final spokenNumber = switch (number.mode) {
+      RollMode.normal => '${number.values.first}',
+      RollMode.advantage => 'higher of ${number.values.join(' and ')}',
+      RollMode.disadvantage => 'lower of ${number.values.join(' and ')}',
+    };
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Semantics(
+        label: '$operator$spokenNumber',
+        button: true,
+        toggled: counted,
+        child: InkWell(
+          onTap: () => setState(() {
+            if (!_counted.add(index)) _counted.remove(index);
+          }),
+          child: ExcludeSemantics(
+            child: Opacity(
+              opacity: counted ? .75 : 1,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (operator.isNotEmpty) ...[
+                    Text(
+                      number.sign < 0 ? '−' : '+',
+                      style: const TextStyle(fontSize: 28, color: muted),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Text(
+                    number.display,
+                    style: TextStyle(
+                      fontSize: number.mode == RollMode.normal ? 40 : 30,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _KeyButton extends StatelessWidget {

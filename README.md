@@ -6,7 +6,9 @@ An offline Android app for practicing D&D dice arithmetic, built with Flutter.
 
 Enable equations in **Equations**, then tap **Start practicing**. Every enabled equation has an equal chance of being selected. Only the rolled numbers and fixed modifiers appear during a question.
 
-Enter a total with the keypad (or a physical keyboard) and check it. A short success/error animation advances automatically to another question. Incorrect answers briefly show the correct total. Correct answers build a streak.
+Tap a number in the calculation to dim it once you’ve counted it. Tap it again to restore it.
+
+Enter a total with the keypad or a physical keyboard. The app checks it as soon as you enter as many digits as the correct total has. For negative answers, enter the minus sign before the digits. A short success/error animation advances automatically to another question. Incorrect answers briefly show the correct total. Correct answers build a streak.
 
 Practice continues until you leave. Each submitted answer saves independently; quitting never creates a result or counts an unfinished question. Backgrounding pauses practice; resuming gives a fresh roll so time away never affects response times.
 
